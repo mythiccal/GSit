@@ -249,7 +249,9 @@ public class GSitMain extends JavaPlugin {
 
     private void setupEvents() {
         getServer().getPluginManager().registerEvents(new PlayerEventHandler(this), this);
-        getServer().getPluginManager().registerEvents(new PlayerSitEventHandler(this), this);
+        PlayerSitEventHandler playerSitEventHandler = new PlayerSitEventHandler(this);
+        getServer().getPluginManager().registerEvents(playerSitEventHandler, this);
+        playerSitEventHandler.registerEntityTeleportAsyncEvent();
         getServer().getPluginManager().registerEvents(new BlockEventHandler(this), this);
         getServer().getPluginManager().registerEvents(new SitEventHandler(this), this);
         getServer().getPluginManager().registerEvents(new CrawlEventHandler(this), this);

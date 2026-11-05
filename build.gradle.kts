@@ -1,3 +1,5 @@
+import io.papermc.paperweight.userdev.PaperweightUserExtension
+
 plugins {
     `java-library`
     `maven-publish`
@@ -6,6 +8,11 @@ plugins {
 }
 
 allprojects {
+    // paper dev bundles declare this without a version, which fails resolution
+    dependencies.components {
+        withModule<DropVersionlessAnsi>("io.papermc.paper:dev-bundle")
+    }
+
     repositories {
         mavenLocal()
         mavenCentral()
@@ -23,6 +30,22 @@ allprojects {
     tasks.withType<Javadoc>().configureEach {
         options.encoding = "UTF-8"
     }
+
+    pluginManager.withPlugin("io.papermc.paperweight.userdev") {
+        afterEvaluate {
+            val toolchainVersion = extensions.getByType<JavaPluginExtension>().toolchain.languageVersion.get().asInt()
+            if (toolchainVersion < 21) {
+                val realLauncher = javaToolchains.launcherFor {
+                    languageVersion.set(JavaLanguageVersion.of(21))
+                }.get()
+                val dispatchExe = rootProject.layout.projectDirectory.file(".jdk-dispatch/$toolchainVersion/java.exe")
+                extensions.getByType<PaperweightUserExtension>().javaLauncher.set(object : JavaLauncher {
+                    override fun getMetadata() = realLauncher.metadata
+                    override fun getExecutablePath() = dispatchExe
+                })
+            }
+        }
+    }
 }
 
 java {
@@ -31,26 +54,6 @@ java {
 
 dependencies {
     api(project(":core"))
-    api(project(":v1_17_1", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_18", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_18_2", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_19", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_19_1", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_19_3", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_19_4", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_20", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_20_2", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_20_3", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_20_5", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_2", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_4", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_5", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_6", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_9", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v1_21_11", io.papermc.paperweight.util.constants.REOBF_CONFIG))
-    api(project(":v26_1", "default"))
-    api(project(":v26_2", "default"))
     api(project(":v26_3", "default"))
 }
 
@@ -130,13 +133,27 @@ tasks {
             from(resourceTask)
 
             manifest {
-                attributes["paperweight-mappings-namespace"] = io.papermc.paperweight.util.constants.SPIGOT_NAMESPACE
+                attributes["paperweight-mappings-namespace"] = io.papermc.paperweight.util.constants.DEOBF_NAMESPACE
             }
         }
     }
 
     build {
         dependsOn(jarTasks.values)
+    }
+}
+
+abstract class DropVersionlessAnsi : ComponentMetadataRule {
+    override fun execute(context: ComponentMetadataContext) {
+        context.details.allVariants {
+            withDependencies {
+                removeAll {
+                    it.group == "net.kyori" &&
+                        it.name == "adventure-text-serializer-ansi" &&
+                        it.versionConstraint.requiredVersion.isEmpty()
+                }
+            }
+        }
     }
 }
 

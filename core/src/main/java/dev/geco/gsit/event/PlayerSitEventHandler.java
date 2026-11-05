@@ -9,10 +9,12 @@ import org.bukkit.Material;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInteractAtEntityEvent;
@@ -47,6 +49,17 @@ public class PlayerSitEventHandler implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void playerTeleportEvent(PlayerTeleportEvent event) { gSitMain.getPlayerSitService().stopPlayerSit(event.getPlayer(), StopReason.TELEPORT); }
+
+    // Canvas doesn't call PlayerTeleportEvent for teleportAsync and would otherwise teleport the whole player sit stack
+    public void registerEntityTeleportAsyncEvent() {
+        Class<? extends Event> entityTeleportAsyncEvent;
+        try {
+            entityTeleportAsyncEvent = Class.forName("io.canvasmc.canvas.event.EntityTeleportAsyncEvent").asSubclass(Event.class);
+        } catch(ClassNotFoundException e) { return; }
+        Bukkit.getPluginManager().registerEvent(entityTeleportAsyncEvent, this, EventPriority.LOWEST, (listener, event) -> {
+            if(entityTeleportAsyncEvent.isInstance(event) && ((EntityEvent) event).getEntity() instanceof Player player) gSitMain.getPlayerSitService().stopPlayerSit(player, StopReason.TELEPORT);
+        }, gSitMain, true);
+    }
 
     @EventHandler(ignoreCancelled = true, priority = EventPriority.LOWEST)
     public void entityDamageEvent(EntityDamageEvent event) { if(event.getCause() == EntityDamageEvent.DamageCause.FALL && event.getEntity() instanceof LivingEntity && event.getEntity().getVehicle() != null && event.getEntity().getVehicle().getScoreboardTags().contains(PlayerSitService.PLAYERSIT_ENTITY_TAG)) event.setCancelled(true); }
